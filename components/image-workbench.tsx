@@ -4,151 +4,144 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   Copy,
   Download,
+  Eraser,
   Heart,
   History,
-  Brush,
-  SlidersHorizontal,
   ImageIcon,
   LoaderCircle,
   Maximize2,
-  RotateCcw,
+  RefreshCcw,
   Search,
   Sparkles,
   Trash2,
   WandSparkles,
-  X
+  X,
 } from 'lucide-react';
 import type { AspectRatio, GeneratedArtwork, StylePreset } from '@/lib/types';
-
-type ManagedArtwork = GeneratedArtwork & {
-  isFavorite?: boolean;
-  elapsedMs?: number;
-};
-
-const examples = [
-  '一双白色运动鞋放置在现代极简展台上，柔和自然光，电商主图，干净背景，高级质感',
-  '高端护肤品放在大理石台面，金色光影，广告摄影，适合品牌官网首屏海报',
-  '咖啡豆与咖啡杯组合，暖色调，品牌宣传海报，浅景深，生活方式摄影'
-];
-
-const promptTemplates = [
-  {
-    name: '美妆护肤',
-    tag: '自然光 / 高级感',
-    prompt: '一套高端护肤品放在白色大理石台面上，水滴、绿植和柔和自然光，干净背景，电商广告摄影，高级质感'
-  },
-  {
-    name: '食品饮品',
-    tag: '生活方式 / 暖色调',
-    prompt: '一杯冰拿铁放在木质桌面上，旁边有咖啡豆和阳光阴影，暖色调，生活方式摄影，适合品牌宣传图'
-  },
-  {
-    name: '数码产品',
-    tag: '科技感 / 深色背景',
-    prompt: '一副无线耳机悬浮在深色渐变背景前，科技感灯光，产品细节清晰，电商主图，未来感构图'
-  },
-  {
-    name: '家居用品',
-    tag: '舒适氛围 / 空间场景',
-    prompt: '一盏现代台灯放在极简卧室床头柜上，暖光照明，柔和阴影，家居品牌宣传图，舒适氛围'
-  },
-  {
-    name: '服饰鞋包',
-    tag: '杂志大片 / 品牌广告',
-    prompt: '一个黑色皮质手提包放在米色布景中，柔和侧光，杂志大片构图，高端品牌广告摄影'
-  }
-];
-
-
-
-const editPresets = [
-  '改成暖色阳光氛围，适合春夏促销海报',
-  '背景换成高级灰极简摄影棚，突出商品主体',
-  '增加节日礼盒氛围，画面更适合电商活动页',
-  '变成杂志封面构图，增加高级品牌感'
-];
 
 const styles: StylePreset[] = ['电商主图', '品牌广告', '极简风', '生活方式', '杂志封面'];
 const ratios: AspectRatio[] = ['1:1', '4:3', '3:4', '16:9'];
 
+const promptTemplates = [
+  {
+    label: '美妆护肤',
+    value:
+      '一瓶高端护肤精华放在大理石台面上，水滴质感，柔和自然光，干净背景，适合电商主图和品牌广告。',
+  },
+  {
+    label: '食品饮品',
+    value:
+      '一杯冰拿铁放在木质桌面上，周围有咖啡豆和阳光阴影，暖色调，生活方式摄影，适合社交媒体宣传。',
+  },
+  {
+    label: '数码产品',
+    value:
+      '一副无线耳机悬浮在深色渐变背景中，蓝色科技光效，高级商业摄影，突出产品质感和未来感。',
+  },
+  {
+    label: '服饰鞋包',
+    value:
+      '一双白色运动鞋放在极简展台上，干净背景，柔和阴影，产品轮廓清晰，适合电商商品详情页。',
+  },
+  {
+    label: '家居生活',
+    value:
+      '一盏现代台灯放在温馨客厅角落，柔和暖光，北欧风格，杂志封面构图，突出家居氛围。',
+  },
+];
+
+const editPresets = [
+  '背景换成暖色阳光',
+  '改成高级黑金广告风',
+  '增加水雾和冷色轮廓光',
+  '改为极简白底电商主图',
+];
+
+type FilterMode = 'all' | 'favorite';
+
+function formatTime(ms?: number) {
+  if (!ms) return '—';
+  if (ms < 1000) return `${ms} ms`;
+  return `${(ms / 1000).toFixed(1)} s`;
+}
+
 export default function ImageWorkbench() {
-  const [prompt, setPrompt] = useState(examples[0]);
-  const [negativePrompt, setNegativePrompt] = useState('低清晰度、文字水印、畸形商品、过度变形、杂乱背景');
-  const [editInstruction, setEditInstruction] = useState(editPresets[0]);
-  const [enhancing, setEnhancing] = useState(false);
+  const [prompt, setPrompt] = useState(promptTemplates[0].value);
+  const [negativePrompt, setNegativePrompt] = useState('文字水印，低清晰度，畸形，重复主体，模糊，过曝，噪点');
   const [style, setStyle] = useState<StylePreset>('电商主图');
   const [aspectRatio, setAspectRatio] = useState<AspectRatio>('1:1');
-  const [history, setHistory] = useState<ManagedArtwork[]>([]);
-  const [selected, setSelected] = useState<ManagedArtwork | null>(null);
+  const [history, setHistory] = useState<GeneratedArtwork[]>([]);
+  const [selected, setSelected] = useState<GeneratedArtwork | null>(null);
   const [loading, setLoading] = useState(false);
+  const [enhancing, setEnhancing] = useState(false);
+  const [editInstruction, setEditInstruction] = useState('');
+  const [filter, setFilter] = useState<FilterMode>('all');
+  const [query, setQuery] = useState('');
   const [error, setError] = useState('');
-  const [search, setSearch] = useState('');
-  const [onlyFavorites, setOnlyFavorites] = useState(false);
-  const [previewOpen, setPreviewOpen] = useState(false);
-  const [copied, setCopied] = useState('');
+  const [preview, setPreview] = useState<GeneratedArtwork | null>(null);
 
   useEffect(() => {
-    async function loadArtworks() {
-      try {
-        const response = await fetch('/api/artworks', { cache: 'no-store' });
-        const data = await response.json();
-        if (!response.ok) throw new Error(data.error || '读取作品失败');
-        const items = (data.items ?? []) as ManagedArtwork[];
-        setHistory(items);
-        setSelected(items[0] ?? null);
-      } catch (e) {
-        console.error(e);
-        setError(e instanceof Error ? e.message : '读取作品失败');
-      }
-    }
-
     loadArtworks();
   }, []);
 
-  function persist(items: ManagedArtwork[]) {
-    setHistory(items);
+  async function loadArtworks() {
+    try {
+      const response = await fetch('/api/artworks', { cache: 'no-store' });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || '作品加载失败');
+      const items = (data.items || []) as GeneratedArtwork[];
+      setHistory(items);
+      setSelected(items[0] ?? null);
+    } catch (e) {
+      console.error(e);
+      setError(e instanceof Error ? e.message : '作品加载失败');
+    }
   }
 
-  const status = useMemo(() => selected?.demo ? '演示模式' : selected ? '真实模型' : '等待创作', [selected]);
-  const favoriteCount = useMemo(() => history.filter(item => item.isFavorite).length, [history]);
-
   const filteredHistory = useMemo(() => {
-    const keyword = search.trim().toLowerCase();
-    return history.filter(item => {
-      const matchFavorite = onlyFavorites ? item.isFavorite : true;
-      const matchKeyword = keyword
-        ? `${item.prompt} ${item.style} ${item.aspectRatio} ${item.provider} ${item.model}`.toLowerCase().includes(keyword)
-        : true;
-      return matchFavorite && matchKeyword;
+    const keyword = query.trim().toLowerCase();
+    return history.filter((item) => {
+      const favoriteMatched = filter === 'all' || item.isFavorite;
+      const queryMatched =
+        !keyword ||
+        item.prompt.toLowerCase().includes(keyword) ||
+        item.style.toLowerCase().includes(keyword) ||
+        item.provider?.toLowerCase().includes(keyword);
+      return favoriteMatched && queryMatched;
     });
-  }, [history, search, onlyFavorites]);
+  }, [history, filter, query]);
 
-  async function generateWith(params?: { prompt?: string; style?: StylePreset; aspectRatio?: AspectRatio }) {
-    const nextPrompt = (params?.prompt ?? prompt).trim();
-    const nextStyle = params?.style ?? style;
-    const nextRatio = params?.aspectRatio ?? aspectRatio;
+  const status = useMemo(() => {
+    if (loading) return '生成中';
+    if (selected?.demo) return '演示模式';
+    if (selected) return '真实模型';
+    return '就绪';
+  }, [selected, loading]);
 
-    if (nextPrompt.length < 3) return setError('请先输入更完整的商品或场景描述。');
+  async function generate(customPrompt?: string) {
+    const finalPrompt = (customPrompt || prompt).trim();
+    if (finalPrompt.length < 2) {
+      setError('请先输入商品或场景描述。');
+      return;
+    }
+
     setLoading(true);
     setError('');
+    const startedAt = performance.now();
 
-    const start = performance.now();
     try {
       const response = await fetch('/api/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          prompt: nextPrompt,
-          style: nextStyle,
-          aspectRatio: nextRatio,
-          negativePrompt,
-        })
+        body: JSON.stringify({ prompt: finalPrompt, negativePrompt, style, aspectRatio }),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || '生成失败');
-      const item: ManagedArtwork = { ...data, elapsedMs: data.elapsedMs ?? Math.round(performance.now() - start) };
-      const next = [item, ...history].slice(0, 24);
-      persist(next);
+
+      const elapsedMs = data.elapsedMs ?? Math.round(performance.now() - startedAt);
+      const item = { ...data, elapsedMs } as GeneratedArtwork;
+      const next = [item, ...history.filter((old) => old.id !== item.id)].slice(0, 48);
+      setHistory(next);
       setSelected(item);
     } catch (e) {
       setError(e instanceof Error ? e.message : '生成失败');
@@ -157,23 +150,25 @@ export default function ImageWorkbench() {
     }
   }
 
-  async function generate() {
-    await generateWith();
-  }
-
   async function enhancePrompt() {
-    if (prompt.trim().length < 2) return setError('请先输入商品或场景关键词。');
+    const raw = prompt.trim();
+    if (!raw) {
+      setError('请先输入需要优化的商品描述。');
+      return;
+    }
+
     setEnhancing(true);
     setError('');
+
     try {
       const response = await fetch('/api/enhance-prompt', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt, style, aspectRatio })
+        body: JSON.stringify({ prompt: raw, style }),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Prompt 优化失败');
-      setPrompt(data.prompt);
+      setPrompt(data.prompt || raw);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Prompt 优化失败');
     } finally {
@@ -181,234 +176,389 @@ export default function ImageWorkbench() {
     }
   }
 
-  async function editSelected() {
-    if (!selected) return setError('请先选择一张要二次编辑的作品。');
-    if (editInstruction.trim().length < 3) return setError('请输入更具体的编辑要求。');
+  async function editAndGenerate() {
+    if (!selected) {
+      setError('请先选择一张作品再进行二次编辑。');
+      return;
+    }
+    if (!editInstruction.trim()) {
+      setError('请输入二次编辑要求。');
+      return;
+    }
 
-    const editedPrompt = `基于已有商品视觉：${selected.prompt}。二次编辑要求：${editInstruction.trim()}。保持商品主体清晰、商业摄影级光影、构图高级、适合电商或品牌营销使用。`;
+    const editedPrompt = `基于已有商品视觉：${selected.prompt}\n\n二次编辑要求：${editInstruction.trim()}\n\n保持商品主体清晰、商业摄影质感、适合品牌展示和电商使用。`;
     setPrompt(editedPrompt);
-    setStyle(selected.style);
-    setAspectRatio(selected.aspectRatio);
-    await generateWith({ prompt: editedPrompt, style: selected.style, aspectRatio: selected.aspectRatio });
+    await generate(editedPrompt);
   }
 
-  async function clearHistory() {
-    const ids = history.map(item => item.id);
-    persist([]);
-    setSelected(null);
+  async function toggleFavorite(item: GeneratedArtwork) {
+    const nextValue = !item.isFavorite;
+    setHistory((items) => items.map((old) => (old.id === item.id ? { ...old, isFavorite: nextValue } : old)));
+    if (selected?.id === item.id) setSelected({ ...selected, isFavorite: nextValue });
 
-    await Promise.all(
-      ids.map(id =>
-        fetch(`/api/artworks?id=${encodeURIComponent(id)}`, { method: 'DELETE' }).catch(console.error)
-      )
-    );
-  }
-
-  async function deleteItem(id: string) {
-    const previous = history;
-    const next = history.filter(item => item.id !== id);
-    persist(next);
-    if (selected?.id === id) setSelected(next[0] ?? null);
-
-    const response = await fetch(`/api/artworks?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
-    if (!response.ok) {
-      const data = await response.json().catch(() => ({}));
-      persist(previous);
-      setError(data.error || '删除作品失败');
+    try {
+      const response = await fetch('/api/artworks', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: item.id, isFavorite: nextValue }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || '收藏同步失败');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : '收藏同步失败');
+      await loadArtworks();
     }
   }
 
-  async function toggleFavorite(item: ManagedArtwork) {
-    const nextFavorite = !item.isFavorite;
-    const previous = history;
-    const next = history.map(historyItem =>
-      historyItem.id === item.id ? { ...historyItem, isFavorite: nextFavorite } : historyItem
-    );
-    persist(next);
-    if (selected?.id === item.id) setSelected({ ...item, isFavorite: nextFavorite });
+  async function deleteArtwork(item: GeneratedArtwork) {
+    const next = history.filter((old) => old.id !== item.id);
+    setHistory(next);
+    if (selected?.id === item.id) setSelected(next[0] ?? null);
 
-    const response = await fetch('/api/artworks', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: item.id, isFavorite: nextFavorite })
-    });
-
-    if (!response.ok) {
-      const data = await response.json().catch(() => ({}));
-      persist(previous);
-      if (selected?.id === item.id) setSelected(item);
-      setError(data.error || '更新收藏失败');
+    try {
+      const response = await fetch(`/api/artworks?id=${item.id}`, { method: 'DELETE' });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || '删除失败');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : '删除失败');
+      await loadArtworks();
     }
   }
 
-  function reusePrompt(item: ManagedArtwork) {
-    setPrompt(item.prompt);
-    setStyle(item.style);
-    setAspectRatio(item.aspectRatio);
-    setSelected(item);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+  function copyPrompt(text: string) {
+    navigator.clipboard.writeText(text);
   }
 
-  async function copyPrompt(item: ManagedArtwork) {
-    await navigator.clipboard.writeText(item.prompt);
-    setCopied(item.id);
-    window.setTimeout(() => setCopied(''), 1200);
-  }
-
-  function download(item: ManagedArtwork) {
+  function download(item: GeneratedArtwork) {
     const anchor = document.createElement('a');
     anchor.href = item.imageUrl;
     anchor.download = `visioncraft-${item.id}.png`;
     anchor.click();
   }
 
+  function applyTemplate(value: string) {
+    setPrompt(value);
+  }
+
   return (
     <main className="shell">
       <header className="topbar">
         <div className="brand">
-          <span className="brand-mark"><WandSparkles size={21} /></span>
+          <span className="brand-mark">
+            <WandSparkles size={21} />
+          </span>
           <div>
             <strong>VisionCraft AI</strong>
             <small>AI 商品视觉生成平台</small>
           </div>
         </div>
-        <div className="status"><span></span>{status}</div>
+
+        <div className="topbar-actions">
+          <div className="model-pill">Doubao Seedream</div>
+          <div className="status">
+            <span />
+            {status}
+          </div>
+        </div>
       </header>
 
-      <section className="hero">
+      <section className="hero compact-hero">
         <div>
-          <div className="eyebrow"><Sparkles size={15} /> AI COMMERCE VISUAL STUDIO</div>
-          <h1>AI 生成商品主图<br /><em>让营销设计效率提升 10 倍</em></h1>
-          <p>面向电商、品牌营销和自媒体运营，通过 AI 快速生成商品图、广告图、宣传海报和创意视觉素材。</p>
+          <div className="eyebrow">
+            <Sparkles size={15} /> AI PRODUCT VISUAL STUDIO
+          </div>
+          <h1>
+            AI 生成商品主图，
+            <br />
+            <em>让营销设计效率提升 10 倍</em>
+          </h1>
+          <p>
+            面向电商、品牌营销和内容创作者的 AI 商品视觉工作台。支持 Prompt 增强、商业风格预设、
+            二次编辑、作品收藏和数据库持久化。
+          </p>
         </div>
         <div className="metrics">
-          <div><b>{history.length}</b><span>生成作品</span></div>
-          <div><b>{favoriteCount}</b><span>收藏作品</span></div>
-          <div><b>DB</b><span>云端作品库</span></div>
+          <div>
+            <b>5</b>
+            <span>商业风格</span>
+          </div>
+          <div>
+            <b>4</b>
+            <span>常用画幅</span>
+          </div>
+          <div>
+            <b>{history.length}</b>
+            <span>作品记录</span>
+          </div>
         </div>
       </section>
 
-      <section className="workspace">
+      <section className="workspace pro-workspace">
         <aside className="panel controls">
-          <div className="panel-title"><span>01</span><div><h2>商品视觉生成</h2><p>选择模板、输入描述并生成商业素材</p></div></div>
+          <div className="panel-title sticky-title">
+            <span>01</span>
+            <div>
+              <h2>创作控制台</h2>
+              <p>输入商品描述，优化 Prompt 并生成图片</p>
+            </div>
+          </div>
 
           <label>Prompt 模板</label>
           <div className="template-grid">
-            {promptTemplates.map(item => (
-              <button key={item.name} onClick={() => setPrompt(item.prompt)}>
-                <strong>{item.name}</strong>
-                <small>{item.tag}</small>
+            {promptTemplates.map((item) => (
+              <button key={item.label} onClick={() => applyTemplate(item.value)}>
+                {item.label}
               </button>
             ))}
           </div>
 
           <label>商品 / 场景描述</label>
-          <textarea value={prompt} onChange={e => setPrompt(e.target.value)} maxLength={1000} placeholder="描述商品、背景、光线、镜头、材质和营销场景……" />
-          <div className="char-count">{prompt.length} / 1000</div>
-          <div className="example-row">{examples.map((item, index) => <button key={item} onClick={() => setPrompt(item)}>商业示例 {index + 1}</button>)}</div>
-
-          <div className="quick-tools">
-            <button type="button" className="mini-action" disabled={enhancing} onClick={enhancePrompt}>
-              {enhancing ? <LoaderCircle className="spin" size={14} /> : <Sparkles size={14} />}AI 优化 Prompt
-            </button>
-            <button type="button" className="mini-action ghost" onClick={() => setPrompt(prompt.replace(/，/g, '，').trim())}>
-              <SlidersHorizontal size={14} />整理描述
-            </button>
+          <div className="prompt-box">
+            <textarea
+              value={prompt}
+              onChange={(e) => setPrompt(e.target.value)}
+              maxLength={1600}
+              placeholder="例如：一瓶高端香水放在黑色岩石上，周围有薄雾和冷色轮廓光……"
+            />
+            <div className="prompt-footer">
+              <span>{prompt.length} / 1600</span>
+              <button onClick={enhancePrompt} disabled={enhancing}>
+                {enhancing ? <LoaderCircle className="spin" /> : <Sparkles size={14} />}
+                AI 优化 Prompt
+              </button>
+            </div>
           </div>
 
           <label>负面提示词</label>
-          <textarea className="negative-area" value={negativePrompt} onChange={e => setNegativePrompt(e.target.value)} maxLength={500} placeholder="不希望出现的内容，例如：水印、文字、畸形、低清晰度……" />
+          <textarea
+            className="negative-input"
+            value={negativePrompt}
+            onChange={(e) => setNegativePrompt(e.target.value)}
+            placeholder="不希望出现的内容，例如：水印、模糊、低清晰度……"
+          />
 
-          <label>商业风格</label>
-          <div className="choice-grid">{styles.map(item => <button className={style === item ? 'active' : ''} key={item} onClick={() => setStyle(item)}>{item}</button>)}</div>
+          <label>视觉风格</label>
+          <div className="choice-grid">
+            {styles.map((item) => (
+              <button className={style === item ? 'active' : ''} key={item} onClick={() => setStyle(item)}>
+                {item}
+              </button>
+            ))}
+          </div>
 
           <label>画面比例</label>
-          <div className="ratio-grid">{ratios.map(item => <button className={aspectRatio === item ? 'active' : ''} key={item} onClick={() => setAspectRatio(item)}><i className={`ratio r-${item.replace(':', '-')}`}></i>{item}</button>)}</div>
-
-          {error && <div className="error">{error}</div>}
-          <button className="generate" disabled={loading} onClick={generate}>{loading ? <><LoaderCircle className="spin" />正在生成商业视觉</> : <><Sparkles />生成商品图</>}</button>
-          <p className="hint">已支持火山方舟 / 豆包 Seedream。未配置 API Key 时自动进入演示模式。</p>
-
-          <div className="edit-panel">
-            <div className="edit-title"><Brush size={15} /><strong>AI 二次编辑</strong><span>基于选中作品重绘</span></div>
-            <textarea className="negative-area" value={editInstruction} onChange={e => setEditInstruction(e.target.value)} maxLength={500} placeholder="例如：换成暖色阳光、背景改成极简摄影棚、增加节日氛围……" />
-            <div className="edit-presets">
-              {editPresets.map(item => <button key={item} type="button" onClick={() => setEditInstruction(item)}>{item}</button>)}
-            </div>
-            <button className="mini-action edit-submit" disabled={loading || !selected} onClick={editSelected}><Brush size={14} />编辑并生成新图</button>
+          <div className="ratio-grid">
+            {ratios.map((item) => (
+              <button className={aspectRatio === item ? 'active' : ''} key={item} onClick={() => setAspectRatio(item)}>
+                <i className={`ratio r-${item.replace(':', '-')}`} />
+                {item}
+              </button>
+            ))}
           </div>
+
+          <button className="generate" disabled={loading} onClick={() => generate()}>
+            {loading ? (
+              <>
+                <LoaderCircle className="spin" />
+                正在生成商业视觉
+              </>
+            ) : (
+              <>
+                <Sparkles />
+                生成商品图
+              </>
+            )}
+          </button>
+
+          {error && (
+            <div className="error">
+              <strong>提示：</strong>
+              {error}
+            </div>
+          )}
         </aside>
 
-        <div className="panel canvas-panel">
-          <div className="panel-title"><span>02</span><div><h2>商品图预览</h2><p>{selected ? `${selected.provider} · ${selected.model}` : '生成结果将在此显示'}</p></div></div>
-          <div className={`canvas ratio-${selected?.aspectRatio?.replace(':', '-') || aspectRatio.replace(':', '-')}`}>
+        <section className="panel canvas-panel">
+          <div className="panel-title">
+            <span>02</span>
+            <div>
+              <h2>作品预览</h2>
+              <p>{selected ? `${selected.provider} · ${selected.model}` : '生成结果将在这里显示'}</p>
+            </div>
+          </div>
+
+          <div className={`canvas pro-canvas ratio-${selected?.aspectRatio?.replace(':', '-') || aspectRatio.replace(':', '-')}`}>
             {loading ? (
-              <div className="empty"><LoaderCircle className="spin big" /><h3>正在生成商品视觉</h3><p>模型正在理解商品卖点、光影和构图</p></div>
+              <div className="empty premium-empty">
+                <LoaderCircle className="spin big" />
+                <h3>正在生成商品视觉</h3>
+                <p>模型正在解析商品主体、光线、构图和商业场景。</p>
+              </div>
             ) : selected ? (
               <>
                 <img src={selected.imageUrl} alt={selected.prompt} />
-                <div className="image-actions multi-actions">
-                  <button onClick={() => setPreviewOpen(true)}><Maximize2 size={17} />预览</button>
-                  <button onClick={() => copyPrompt(selected)}><Copy size={17} />{copied === selected.id ? '已复制' : '复制 Prompt'}</button>
-                  <button onClick={() => reusePrompt(selected)}><RotateCcw size={17} />再次生成</button>
-                  <button onClick={editSelected}><Brush size={17} />二次编辑</button>
-                  <button onClick={() => toggleFavorite(selected)}><Heart size={17} className={selected.isFavorite ? 'heart-active' : ''} />{selected.isFavorite ? '已收藏' : '收藏'}</button>
-                  <button onClick={() => download(selected)}><Download size={17} />下载 PNG</button>
-                </div>
                 {selected.demo && <span className="demo-badge">DEMO</span>}
+                <div className="image-toolbar">
+                  <button onClick={() => toggleFavorite(selected)} className={selected.isFavorite ? 'is-favorite' : ''}>
+                    <Heart size={16} fill={selected.isFavorite ? 'currentColor' : 'none'} />
+                    收藏
+                  </button>
+                  <button onClick={() => setPreview(selected)}>
+                    <Maximize2 size={16} />
+                    预览
+                  </button>
+                  <button onClick={() => download(selected)}>
+                    <Download size={16} />
+                    下载
+                  </button>
+                </div>
               </>
             ) : (
-              <div className="empty"><span><ImageIcon /></span><h3>开始生成第一张商品图</h3><p>选择模板或输入商品描述，然后点击生成</p></div>
+              <div className="empty premium-empty">
+                <span>
+                  <ImageIcon />
+                </span>
+                <h3>等待生成第一张商品图</h3>
+                <p>生成后可收藏、下载、二次编辑，并保存到 Supabase 数据库。</p>
+              </div>
             )}
           </div>
-          {selected && <div className="result-meta result-meta-3"><div><span>Prompt</span><p>{selected.prompt}</p></div><div><span>参数</span><p>{selected.style} · {selected.aspectRatio}</p></div><div><span>模型信息</span><p>{selected.provider} · {selected.elapsedMs ? `${(selected.elapsedMs / 1000).toFixed(1)}s` : '历史记录'}</p></div></div>}
-        </div>
+
+          {selected && (
+            <div className="inspector">
+              <div className="inspector-card prompt-card">
+                <span>Prompt</span>
+                <p>{selected.prompt}</p>
+                <div className="meta-actions">
+                  <button onClick={() => copyPrompt(selected.prompt)}>
+                    <Copy size={14} />
+                    复制
+                  </button>
+                  <button onClick={() => setPrompt(selected.prompt)}>
+                    <RefreshCcw size={14} />
+                    再次使用
+                  </button>
+                </div>
+              </div>
+              <div className="inspector-card">
+                <span>参数</span>
+                <p>
+                  {selected.style} · {selected.aspectRatio}
+                </p>
+              </div>
+              <div className="inspector-card">
+                <span>耗时</span>
+                <p>{formatTime(selected.elapsedMs)}</p>
+              </div>
+            </div>
+          )}
+
+          <div className="edit-panel">
+            <div>
+              <h3>AI 二次编辑</h3>
+              <p>基于当前作品继续调整背景、光线、风格或构图。</p>
+            </div>
+            <div className="edit-presets">
+              {editPresets.map((item) => (
+                <button key={item} onClick={() => setEditInstruction(item)}>
+                  {item}
+                </button>
+              ))}
+            </div>
+            <div className="edit-row">
+              <input
+                value={editInstruction}
+                onChange={(e) => setEditInstruction(e.target.value)}
+                placeholder="例如：背景换成暖色阳光，保留商品主体"
+              />
+              <button disabled={!selected || loading} onClick={editAndGenerate}>
+                <WandSparkles size={16} />
+                编辑生成
+              </button>
+            </div>
+          </div>
+        </section>
       </section>
 
       <section className="history-section">
-        <div className="section-heading">
-          <div><span><History size={18} /></span><h2>作品管理</h2><b>{filteredHistory.length} / {history.length}</b></div>
-          {history.length > 0 && <button onClick={clearHistory}><Trash2 size={16} />清空记录</button>}
-        </div>
+        <div className="section-heading history-heading">
+          <div>
+            <span>
+              <History size={18} />
+            </span>
+            <h2>作品库</h2>
+            <b>{filteredHistory.length}</b>
+          </div>
 
-        <div className="history-toolbar">
-          <div className="search-box"><Search size={15} /><input value={search} onChange={e => setSearch(e.target.value)} placeholder="搜索 Prompt、风格、模型……" /></div>
-          <button className={onlyFavorites ? 'toolbar-active' : ''} onClick={() => setOnlyFavorites(value => !value)}><Heart size={15} />只看收藏</button>
+          <div className="history-tools">
+            <div className="search-box">
+              <Search size={15} />
+              <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="搜索 Prompt / 风格" />
+            </div>
+            <button className={filter === 'all' ? 'active' : ''} onClick={() => setFilter('all')}>
+              全部
+            </button>
+            <button className={filter === 'favorite' ? 'active' : ''} onClick={() => setFilter('favorite')}>
+              收藏
+            </button>
+            <button onClick={loadArtworks}>
+              <RefreshCcw size={15} />
+              刷新
+            </button>
+          </div>
         </div>
 
         {filteredHistory.length ? (
-          <div className="gallery managed-gallery">
-            {filteredHistory.map(item => (
-              <article key={item.id} className={selected?.id === item.id ? 'selected artwork-card' : 'artwork-card'}>
-                <button className="artwork-thumb" onClick={() => setSelected(item)}><img src={item.imageUrl} alt={item.prompt} /></button>
-                <div className="artwork-info"><strong>{item.style}</strong><span>{item.aspectRatio}</span></div>
-                <p title={item.prompt}>{item.prompt}</p>
-                <div className="card-actions">
-                  <button onClick={() => toggleFavorite(item)} title="收藏"><Heart size={14} className={item.isFavorite ? 'heart-active' : ''} /></button>
-                  <button onClick={() => copyPrompt(item)} title="复制 Prompt"><Copy size={14} /></button>
-                  <button onClick={() => reusePrompt(item)} title="再次使用"><RotateCcw size={14} /></button>
-                  <button onClick={() => download(item)} title="下载"><Download size={14} /></button>
-                  <button onClick={() => deleteItem(item.id)} title="删除"><Trash2 size={14} /></button>
+          <div className="gallery pro-gallery">
+            {filteredHistory.map((item) => (
+              <article key={item.id} className={selected?.id === item.id ? 'selected' : ''}>
+                <button className="thumb" onClick={() => setSelected(item)}>
+                  <img src={item.imageUrl} alt={item.prompt} />
+                </button>
+                <div className="card-body">
+                  <strong>{item.style}</strong>
+                  <span>{item.aspectRatio} · {formatTime(item.elapsedMs)}</span>
+                  <p>{item.prompt}</p>
+                  <div className="card-actions">
+                    <button onClick={() => toggleFavorite(item)} className={item.isFavorite ? 'is-favorite' : ''}>
+                      <Heart size={14} fill={item.isFavorite ? 'currentColor' : 'none'} />
+                    </button>
+                    <button onClick={() => setPrompt(item.prompt)}>
+                      <RefreshCcw size={14} />
+                    </button>
+                    <button onClick={() => copyPrompt(item.prompt)}>
+                      <Copy size={14} />
+                    </button>
+                    <button onClick={() => deleteArtwork(item)}>
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
                 </div>
               </article>
             ))}
           </div>
         ) : (
-          <div className="history-empty">暂无匹配作品。生成、收藏和搜索结果会显示在这里。</div>
+          <div className="history-empty">
+            <Eraser size={20} />
+            暂无匹配作品。生成后的图片会自动进入作品库。
+          </div>
         )}
       </section>
 
-      {previewOpen && selected && (
-        <div className="preview-mask" onClick={() => setPreviewOpen(false)}>
-          <div className="preview-dialog" onClick={event => event.stopPropagation()}>
-            <button className="preview-close" onClick={() => setPreviewOpen(false)}><X size={18} /></button>
-            <img src={selected.imageUrl} alt={selected.prompt} />
-            <div><strong>{selected.style} · {selected.aspectRatio}</strong><p>{selected.prompt}</p></div>
+      <footer>
+        VisionCraft AI · Next.js · Supabase · Doubao Seedream · Portfolio Edition
+      </footer>
+
+      {preview && (
+        <div className="modal-backdrop" onClick={() => setPreview(null)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <button className="modal-close" onClick={() => setPreview(null)}>
+              <X size={18} />
+            </button>
+            <img src={preview.imageUrl} alt={preview.prompt} />
           </div>
         </div>
       )}
-
-      <footer>VisionCraft AI · Next.js + TypeScript + Doubao Seedream · Portfolio Edition</footer>
     </main>
   );
 }
