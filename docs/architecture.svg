@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="700">
+<defs><style>
+.t{font:700 22px Arial}.s{font:16px Arial}.b{fill:#eef5ff;stroke:#3b82f6;stroke-width:2;rx:10}
+.l{stroke:#64748b;stroke-width:2;marker-end:url(#a)}
+</style>
+<marker id="a" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
+<path d="M0,0 L8,3 L0,6 Z" fill="#64748b"/></marker></defs>
+<text x="420" y="40" class="t">VisionCraft AI Architecture</text>
+
+<rect x="450" y="70" width="300" height="70" class="b"/>
+<text x="515" y="110" class="s">Browser (Next.js + React)</text>
+
+<rect x="420" y="200" width="360" height="90" class="b"/>
+<text x="510" y="235" class="s">Next.js API Routes</text>
+<text x="465" y="260" class="s">/generate  /enhance-prompt  /artworks</text>
+
+<rect x="80" y="390" width="260" height="90" class="b"/>
+<text x="135" y="435" class="s">Doubao Seedream</text>
+
+<rect x="470" y="390" width="260" height="90" class="b"/>
+<text x="530" y="435" class="s">Supabase PostgreSQL</text>
+
+<rect x="860" y="390" width="260" height="90" class="b"/>
+<text x="925" y="435" class="s">Supabase Storage</text>
+
+<line x1="600" y1="140" x2="600" y2="200" class="l"/>
+<line x1="520" y1="290" x2="220" y2="390" class="l"/>
+<line x1="600" y1="290" x2="600" y2="390" class="l"/>
+<line x1="680" y1="290" x2="990" y2="390" class="l"/>
+</svg>

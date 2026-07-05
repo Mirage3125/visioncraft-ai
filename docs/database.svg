@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="600">
+<defs><style>.t{font:700 22px Arial}.s{font:16px monospace}.b{fill:#fff7ed;stroke:#ea580c;stroke-width:2;rx:8}</style></defs>
+<text x="320" y="40" class="t">Artwork Table Design</text>
+<rect x="180" y="70" width="620" height="430" class="b"/>
+<text x="220" y="110" class="s">artworks</text>
+<text x="220" y="145" class="s">id (uuid)</text><text x="220" y="173" class="s">prompt</text><text x="220" y="201" class="s">negative_prompt</text><text x="220" y="229" class="s">style</text><text x="220" y="257" class="s">aspect_ratio</text><text x="220" y="285" class="s">image_url</text><text x="220" y="313" class="s">storage_path</text><text x="220" y="341" class="s">provider</text><text x="220" y="369" class="s">model</text><text x="220" y="397" class="s">is_favorite</text><text x="220" y="425" class="s">created_at</text></svg>
